@@ -13,10 +13,19 @@ upd:insert;
 
 / save tables down to hdb, clear tables, and tell hdb to reload
 / clearing tables removes attributes so reapply
-eod:{t:tables`.;t@:where `g=attr each t@\:`sym;.Q.hdpf[hdb;`:hdb;x;`sym];@[;`sym;`g#] each t;};
+eod: {[today]
+    t:tables`.;
+    t@:where `g=attr each t@\:`sym;
+    .Q.hdpf[hdb;`:hdb;today;`sym];
+    @[;`sym;`g#] each t;
+ }
 
 / create tables from schema & replay log file
-init:{(.[;();:;].)each x;if[null first y;:()];-11!y;};
+init: {[schema; tplog]
+    (.[;();:;].) each schema;
+    if[null first tplog;:()];
+    -11!tplog;
+ }
 
 / get (schema;(logcount;log)) from TP
 init . (hopen tp)"(.u.sub[`;`];`.u `i`L)";

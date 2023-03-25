@@ -1,19 +1,63 @@
-/ Library of common functions used by realtime subscribers
-/ The TP itself uses this library
+/
+Library of common functions used by realtime subscribers
+The TP itself uses this library
+globals used:
+    .u.t - table names as symbols
+    .u.w - dictionary of (table name from .u.t)!(list of (handle to subscriber; chosen syms))
+\
 
 / set namespace to .u
 \d .u
 
-init:{w::t!(count t::tables`.)#()}
+/ set .u.t and initialise .u.w
+init: {
+    t:: tables `.;
+    w:: t!(count t)#()
+ }
 
-del:{w[x]_:w[x;;0]?y};.z.pc:{del[;x]each t};
+/ delete a downstream subscriber from .u.w
+del: {[tab; handle]
+    w[tab]_: w[tab;;0]?handle
+ }
+/ when a downstream subscriber disconnects, stop sending them updates
+.z.pc: {del[;x] each t};
 
-sel:{$[`~y;x;select from x where sym in y]}
+/ select data from a table (not a table name) for a (list of) sym(s)
+sel: {[tab; syms]
+    $[`~syms; tab; select from tab where sym in syms]
+ }
 
-pub:{[t;x]{[t;x;w]if[count x:sel[x]w 1;(neg first w)(`upd;t;x)]}[t;x]each w t}
+/ publish an update for tab to any subscribers
+pub: {[tab; newData]
+    {
+        filteredUpdate: sel[newData; x 1];
+        if[count filteredUpdate; (neg x 0)(`upd; tab; filteredUpdate)];
+    } each w tab
+ }
 
-add:{$[(count w x)>i:w[x;;0]?.z.w;.[`.u.w;(x;i;1);union;y];w[x],:enlist(.z.w;y)];(x;$[99=type v:value x;sel[v]y;@[0#v;`sym;`g#]])}
+/ INTERNAL FUNCTION ONLY
+/ add a downstream subscriber to .u.w
+/ or update their subscribed syms if already subscribed
+add: {[tab; syms]
+    i: w[tab;;0]?.z.w;
+    $[
+        (count w tab) > i; / is this client already subscribed
+        .[`.u.w; (x; i; 1); union; syms]; / if so add any new requested syms
+        w[x],: enlist (.z.w; y); / if not add them to .u.w
+    ];
+    / return the (new) schema, with grouped attr on sym col
+    (tab; @[0 # value tab; `sym; `g#])
+ }
 
-sub:{if[x~`;:sub[;y]each t];if[not x in t;'x];del[x].z.w;add[x;y]}
+/ external function to subscribe to a/all tables
+sub: {[tab; syms]
+    if[tab~`; :sub[; syms] each t];
+    if[not tab in t;'tab];
+    del[tab; .z.w];
+    add[tab; syms]
+ }
 
-end:{(neg union/[w[;;0]])@\:(`.u.end;x)}
+
+end: {[today]
+    (neg (union/) w[;;0]) @\: (`.u.end; today)
+ }

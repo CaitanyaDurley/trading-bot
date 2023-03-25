@@ -37,10 +37,8 @@ if[not system"t";system"t 1000";
 
 /
  globals used
- .u.w - dictionary of tables->(handle;syms)
  .u.i - msg count in log file
  .u.j - total msg count (log file plus those held in buffer)
- .u.t - table names
  .u.L - tp log filename, e.g. `:./sym2008.09.11
  .u.l - handle to tp log file
  .u.d - date
