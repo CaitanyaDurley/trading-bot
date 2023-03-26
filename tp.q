@@ -1,31 +1,92 @@
-/ Usage: q tp.q [schema.q file] [???] -p [TP port]
-/ Example: q tp.q schema.q . -p 5001
+/
+Usage: q tp.q [schema.q file] [prefix for tplog] -p [TP port]
+Example: q tp.q schema.q tplog -p 5001
+globals used:
+    .u.i - msg count in tplog
+    .u.j - total msg count (log file plus those held in buffer)
+    .u.L - tplog hsym, e.g. `:tplog2008.09.11
+    .u.l - handle to tp log file
+    .u.d - today's date (UTC)
+\
 
 if[not system"p";'"ERROR: please specify a port to listen on"];
-if[2 <> count .z.x; '"ERROR: args should be schema.q & TBD"];
-schema: .z.x 0;
-tbd: .z.x 1;
+if[2 <> count .z.x; '"ERROR: args should be schema.q & tplog prefix"];
 
 / load schema
-system "l ", schema
+system "l ", .z.x 0
 
-/ load realtime subscriber library
-\l rsub.q
+/ load realtime publisher library
+\l rpub.q
 / set namespace to .u
 \d .u
 
-ld:{if[not type key L::`$(-10_string L),string x;.[L;();:;()]];i::j::-11!(-2;L);if[0<=type i;-2 (string L)," is a corrupt log. Truncate to length ",(string last i)," and restart";exit 1];hopen L};
-tick:{init[];if[not min(`time`sym~2#key flip value@)each t;'`timesym];@[;`sym;`g#]each t;d::.z.D;if[l::count y;L::`$":",y,"/",x,10#".";l::ld d]};
+/ open a handle to tplog
+openTPlog: {[today]
+    L:: `$(-10_string L), string today;
+    if[not type key L;
+        / if the tplog doesn't already exist, write an empty list
+        .[L;();:;()]
+    ];
+    / replay the tplog (in case TP went down)
+    i:: j:: -11!(-2; L);
+    / if there was a bad entry, -11! returns (blah; length of valid part)
+    if[0 <= type i;
+        -2 (string L),"  is a corrupt log. Truncate to length ",(string last i)," and restart";
+        exit 1
+    ];
+    hopen L
+ }
 
-endofday:{end d;d+:1;if[l;hclose l;l::0(`.u.ld;d)]};
-ts:{if[d<x;if[d<x-1;system"t 0";'"more than one day?"];endofday[]]};
+/ init tables, set template .u.L, set .u.d and call .u.openTPlog
+tick: {[tplogPrefix]
+    init[]; / call .u.init from rpub library
+    if[
+        any not (`time`sym ~ 2 # cols value @) each t;
+        '"Schema has a table whose first 2 columns are not `time`sym"
+    ];
+    L:: `$":", tplogPrefix, 10#".";
+    d:: .z.d;
+    l:: openTPlog d;
+ }
+
+/ function to be called at eod
+eod: {
+    end d; / call .u.end from rpub
+    if[l; hclose l];
+    hdel L;
+    d+: 1;
+    -1 "Beginning new day: ", string d;
+    l:: openTPlog d; / open new tplog handle
+ }
+
+/ check if we've passed into tomorrow
+ts: {[today]
+    if[d < x;
+        eod[];
+    ]
+ };
 
 if[system"t";
- .z.ts:{pub'[t;value each t];@[`.;t;@[;`sym;`g#]0#];i::j;ts .z.D};
- upd:{[t;x]
- if[not -16=type first first x;if[d<"d"$a:.z.P;.z.ts[]];a:"n"$a;x:$[0>type first x;a,x;(enlist(count first x)#a),x]];
- t insert x;if[l;l enlist (`upd;t;x);j+:1];}];
-
+    .z.ts: {
+        / push any updates received since last .z.ts call
+        t pub' value each t;
+        / reapplying the g attr on sym shouldn't be necessary...
+        / @[`.; t; @[; `sym; `g#] 0 #];
+        i:: j; / about to write down to tplog
+        ts .z.d;
+    };
+    upd:{[t;x]
+        if[not -16 = type first first x;
+            if[d < "d"$ a: .z.P; .z.ts[]];
+            a: "n"$a;
+            x: $[0 > type first x;
+                a, x;
+                (enlist(count first x)#a), x
+            ]
+        ];
+        t insert x;if[l;l enlist (`upd;t;x);j+:1];
+    }
+ ];
 if[not system"t";system"t 1000";
  .z.ts:{ts .z.D};
  upd:{[t;x]ts"d"$a:.z.P;
@@ -33,13 +94,5 @@ if[not system"t";system"t 1000";
  f:key flip value t;pub[t;$[0>type first x;enlist f!x;flip f!x]];if[l;l enlist (`upd;t;x);i+:1];}];
 
 \d .
-.u.tick[schema;.z.x 1];
+.u.tick .z.x 1;
 
-/
- globals used
- .u.i - msg count in log file
- .u.j - total msg count (log file plus those held in buffer)
- .u.L - tp log filename, e.g. `:./sym2008.09.11
- .u.l - handle to tp log file
- .u.d - date
-\

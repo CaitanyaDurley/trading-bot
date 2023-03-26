@@ -1,6 +1,5 @@
 /
-Library of common functions used by realtime subscribers
-The TP itself uses this library
+Library of common functions used by realtime publishers, e.g. a TP
 globals used:
     .u.t - table names as symbols
     .u.w - dictionary of (table name from .u.t)!(list of (handle to subscriber; chosen syms))
@@ -12,6 +11,7 @@ globals used:
 / set .u.t and initialise .u.w
 init: {
     t:: tables `.;
+    @[; `sym; `g#] each t;
     w:: t!(count t)#()
  }
 
@@ -57,7 +57,7 @@ sub: {[tab; syms]
     add[tab; syms]
  }
 
-
+/ call .u.end[today] on all downstream subscribers
 end: {[today]
     (neg (union/) w[;;0]) @\: (`.u.end; today)
  }
