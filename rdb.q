@@ -23,10 +23,9 @@ eod: {[today]
 / create tables from schema & replay log file
 init: {[schema; tplog]
     (.[;();:;].) each schema;
-    if[null first tplog;:()];
-    -11!tplog;
+    -11!(-2; tplog);
  }
 
-/ get (schema;(logcount;log)) from TP
-init . (hopen tp)"(.u.sub[`;`];`.u `i`L)";
+/ get (schema; tplog handle) from TP
+init . (hopen tp)"(.u.sub[`;`]; `.u.L)";
 / keep connection open so can receive updates from TP

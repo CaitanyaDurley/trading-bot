@@ -2,8 +2,6 @@
 Usage: q tp.q [schema.q file] [prefix for tplog] -p [TP port]
 Example: q tp.q schema.q tplog -p 5001
 globals used:
-    .u.i - msg count in tplog
-    .u.j - total msg count (log file plus those held in buffer)
     .u.L - tplog hsym, e.g. `:tplog2008.09.11
     .u.l - handle to tp log file
     .u.d - today's date (UTC)
@@ -28,10 +26,10 @@ openTPlog: {[today]
         .[L;();:;()]
     ];
     / replay the tplog (in case TP went down)
-    i:: j:: -11!(-2; L);
+    i: -11!(-2; L);
     / if there was a bad entry, -11! returns (blah; length of valid part)
     if[0 <= type i;
-        -2 (string L),"  is a corrupt log. Truncate to length ",(string last i)," and restart";
+        -2 (string L),"  is a corrupt log. Truncate to length ", (string last i), " and restart";
         exit 1
     ];
     hopen L
@@ -66,33 +64,23 @@ ts: {[today]
     ]
  };
 
-if[system"t";
-    .z.ts: {
-        / push any updates received since last .z.ts call
-        t pub' value each t;
-        / reapplying the g attr on sym shouldn't be necessary...
-        / @[`.; t; @[; `sym; `g#] 0 #];
-        i:: j; / about to write down to tplog
-        ts .z.d;
-    };
-    upd:{[t;x]
-        if[not -16 = type first first x;
-            if[d < "d"$ a: .z.P; .z.ts[]];
-            a: "n"$a;
-            x: $[0 > type first x;
-                a, x;
-                (enlist(count first x)#a), x
-            ]
-        ];
-        t insert x;if[l;l enlist (`upd;t;x);j+:1];
-    }
- ];
-if[not system"t";system"t 1000";
- .z.ts:{ts .z.D};
- upd:{[t;x]ts"d"$a:.z.P;
- if[not -16=type first first x;a:"n"$a;x:$[0>type first x;a,x;(enlist(count first x)#a),x]];
- f:key flip value t;pub[t;$[0>type first x;enlist f!x;flip f!x]];if[l;l enlist (`upd;t;x);i+:1];}];
+.z.ts: {
+    / push any updates received since last .z.ts call
+    t pub' value each t;
+    / reset the tables
+    @[`.; t; @[; `sym; `g#] 0 #];
+    ts .z.d;
+ };
+
+/ function called by FH
+upd:{[t;x]
+    t insert x;
+    if[l; l enlist (`upd; t; x)];
+ };
+
+/ default to 1ms updates
+if[not system"t"; system"t 1"];
+
 
 \d .
 .u.tick .z.x 1;
-
