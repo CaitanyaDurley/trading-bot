@@ -10,7 +10,7 @@
 / / .j.k parses json string into q
 / .j.k .j.j t / note col1 has type of string
 
+n:0
+.z.ws: {n+:1}
 
-.z.ws: {0N! x}
-
-(`$":ws://localhost:80/v1/multimarketdata?symbols=BTCUSD,ETHUSD")""
+(`$":ws://localhost:80")"GET /v1/multimarketdata?symbols=BTCUSD,ETHUSD HTTP/1.1\r\nHost: api.gemini.com\r\n\r\n"
