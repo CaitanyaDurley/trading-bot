@@ -9,23 +9,29 @@ hdb: `$":",.z.x 1;
 / why sleep on linux?
 / if[not "w"=first string .z.o;system "sleep 1"];
 
-upd:insert;
+upd: {[tab; newData]
+    tab insert newData;
+    if[tab = `quotes;
+        j: min exec last i by sym from quotes where i < (count quotes) - count newData;
+        update fills bid, fills ask, fills bsize, fills asize by sym from `quotes where i >= j
+    ];
+ }
 
 / save tables down to hdb, clear tables, and tell hdb to reload
 / clearing tables removes attributes so reapply
-eod: {[today]
-    t:tables`.;
-    t@:where `g=attr each t@\:`sym;
-    .Q.hdpf[hdb;`:hdb;today;`sym];
-    @[;`sym;`g#] each t;
+.u.eod: {[today]
+    t: tables`.;
+    t@: where `g=attr each t@\:`sym;
+    .Q.hdpf[hdb; `:hdb; today; `sym];
+    @[; `sym; `g#] each t;
  }
 
 / create tables from schema & replay log file
 init: {[schema; tplog]
     (.[;();:;].) each schema;
-    -11!(-2; tplog);
+    -11!tplog;
  }
 
 / get (schema; tplog handle) from TP
-init . (hopen tp)"(.u.sub[`;`]; `.u.L)";
+init . (hopen tp)"(.u.sub[`;`]; .u.L)";
 / keep connection open so can receive updates from TP

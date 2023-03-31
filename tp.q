@@ -59,7 +59,7 @@ eod: {
 
 / check if we've passed into tomorrow
 ts: {[today]
-    if[d < x;
+    if[d < today;
         eod[];
     ]
  };

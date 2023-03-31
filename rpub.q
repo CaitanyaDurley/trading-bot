@@ -29,10 +29,10 @@ sel: {[tab; syms]
 
 / publish an update for tab to any subscribers
 pub: {[tab; newData]
-    {
-        filteredUpdate: sel[newData; x 1];
-        if[count filteredUpdate; (neg x 0)(`upd; tab; filteredUpdate)];
-    } each w tab
+    {[tab; newData; w]
+        filteredUpdate: sel[newData; w 1];
+        if[count filteredUpdate; (neg w 0)(`upd; tab; filteredUpdate)];
+    }[tab; newData] each w tab
  }
 
 / INTERNAL FUNCTION ONLY
@@ -42,8 +42,8 @@ add: {[tab; syms]
     i: w[tab;;0]?.z.w;
     $[
         (count w tab) > i; / is this client already subscribed
-        .[`.u.w; (x; i; 1); union; syms]; / if so add any new requested syms
-        w[x],: enlist (.z.w; y); / if not add them to .u.w
+        .[`.u.w; (tab; i; 1); union; syms]; / if so add any new requested syms
+        w[tab],: enlist (.z.w; syms) / if not add them to .u.w
     ];
     / return the (new) schema, with grouped attr on sym col
     (tab; @[0 # value tab; `sym; `g#])
@@ -57,7 +57,7 @@ sub: {[tab; syms]
     add[tab; syms]
  }
 
-/ call .u.end[today] on all downstream subscribers
+/ call .u.eod[today] on all downstream subscribers
 end: {[today]
-    (neg (union/) w[;;0]) @\: (`.u.end; today)
+    (neg (union/) w[;;0]) @\: (`.u.eod; today)
  }

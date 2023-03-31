@@ -1,16 +1,53 @@
-/ websocket open handler x = handle
-.z.wo: {0N! "WS opened: ", string x}
-/ websocket close handler x = handle
-.z.wc: {0N! "WS closed: ", string x}
+/ Usage: q fh.q [TP handle] -p [FH port]
+/ Example: q fh.q host:port -p 5000
 
-/ / .j.j parses q into a json string/
-/ t: ([col1: `a`b`c] col2: 1 2 3) / no distinction between keyed/unkeyed tables
-/ .j.j t
 
-/ / .j.k parses json string into q
-/ .j.k .j.j t / note col1 has type of string
+if[not system"p";'"ERROR: please specify a port to listen on"];
+if[1 <> count .z.x; '"ERROR: arg should be TP handle"];
+tp: hopen `$":", .z.x 0;
 
-n:0
-.z.ws: {n+:1}
 
-(`$":ws://localhost:80")"GET /v1/multimarketdata?symbols=BTCUSD,ETHUSD HTTP/1.1\r\nHost: api.gemini.com\r\n\r\n"
+parseTrades: {[trades]
+    syms: "S"$ trades[;`symbol];
+    sides: ?[trades[;`makerSide] ~\: "bid"; `sell; `buy];
+    prices: "F"$ trades[; `price];
+    sizes: "F"$ trades[; `amount];
+    flip `sym`side`price`size!(syms; sides; prices; sizes)
+ }
+
+parseQuotes: {[quotes]
+    syms: "S"$ quotes[;`symbol];
+    n: count quotes;
+    bidIxs: where quotes[;`side] ~\: "bid";
+    askIxs: (til n) except bidIxs;
+    bids: n#0Nf;
+    asks: n#0Nf;
+    bsizes: n#0Nf;
+    asizes: n#0Nf;
+    bids[bidIxs]: "F"$ quotes[bidIxs; `price];
+    bsizes[bidIxs]: "F"$ quotes[bidIxs; `remaining];
+    asks[askIxs]: "F"$ quotes[askIxs; `price];
+    asizes[askIxs]: "F"$ quotes[askIxs; `remaining];
+    quotes: flip `sym`bid`ask`bsize`asize!(syms; bids; asks; bsizes; asizes);
+    lastNonNull: ('[last; fills]);
+    0! select lastNonNull bid, lastNonNull ask, lastNonNull bsize, lastNonNull asize by sym from quotes
+ }
+
+.z.ws: {
+    x: .j.k x;
+    if[not "update" ~ x`type; 0N! "Received bad msg: ", .Q.s1 x; :`];
+    / timestampms is the no. of ms since 1970.01.01 UTC
+    time: $[`timestampms in key x;
+        `timestamp$ 1000000 * (`long$ x`timestampms) - 946684800000;
+        .z.p
+    ];
+    events: x`events;
+    tradeIxs: where (events[;`type]) ~\: "trade";
+    trades: parseTrades events tradeIxs;
+    if[n: count trades; (neg tp)(`.u.upd; `trades; update time: n#time from trades)];
+    quotes: parseQuotes events (til count events) except tradeIxs;
+    if[n: count quotes; (neg tp)(`.u.upd; `quotes; update time: n#time from quotes)];
+ }
+
+/ here we go
+(`$":ws://localhost:80")"GET /v1/multimarketdata?top_of_book=true&bids=true&offers=true&trades=true&symbols=BTCUSD,ETHUSD HTTP/1.1\r\nHost: api.gemini.com\r\n\r\n";

@@ -1,5 +1,0 @@
-wss kdb client using https://stackoverflow.com/questions/70533879/how-do-i-open-a-secure-wss-websocket-in-kdb
-
-set schema.q
-
-create fh from https://docs.gemini.com/websocket-api/?shell#multi-market-data
