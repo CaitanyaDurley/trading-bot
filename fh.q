@@ -1,5 +1,5 @@
 / Usage: q fh.q [TP handle] -p [FH port]
-/ Example: q fh.q host:port -p 5000
+/ Example: q fh.q :5001 -p 5000
 
 
 if[not system"p";'"ERROR: please specify a port to listen on"];

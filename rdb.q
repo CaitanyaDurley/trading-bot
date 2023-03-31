@@ -1,5 +1,5 @@
 / Usage: q rdb.q [TP handle] [HDB handle] -p [RDB port]
-/ Example: q rdb.q host:port :port -p 5002
+/ Example: q rdb.q :5001 :5003 -p 5002
 
 if[not system"p";'"ERROR: please specify a port to listen on"];
 if[2 <> count .z.x; '"ERROR: args should be TP & HDB handles"];
