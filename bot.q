@@ -2,18 +2,18 @@
 / Example: q bot.q :5001 :5002 :5003 -p 5004
 
 
-/ How much USD we have in the bank
-bank: 1000f;
-/ We will not buy if bank < reserve
-reserve: bank % 10;
-/ How much BTC/ETH/... we're holding
-holding: (`symbol$())!`float$();
+/ Bot parameters
+bank: 1000f; / How much USD we have in the bank
+reserve: bank % 10; / We will not buy if bank < reserve
+holdings: (`symbol$())!`float$(); / how much of each sym we're holding
+botlogPrefix: `:botlog;
+holdingslog: `:holdings;
 
 
 if[not system"p";'"ERROR: please specify a port to listen on"];
 if[3 <> count .z.x; '"ERROR: args should be TP, RDB & HDB handles"];
-tp: hopen `$":",.z.x 0;
-rdb: hopen `$":",.z.x 1;
+tp: `$":",.z.x 0;
+rdb: `$":",.z.x 1;
 hdb: `$":",.z.x 2;
 
 
@@ -52,8 +52,8 @@ trade: {
     / else we sell (note we can never have ask < vwap < bid)
     sell: (exec sym from market) except buy;
     / we can only sell what we hold (no shorting)
-    sell: sell inter where holding > 0;
-    if[count sell; execute[sell; `sell; holding sell]];
+    sell: sell inter where holdings > 0;
+    if[count sell; execute[sell; `sell; holdings sell]];
     / execute buy trades, if we've got enough cash
     if[(bank > reserve) and 0 < count buy;
         usdPerSym: bank % 2 * count buy;
@@ -67,27 +67,75 @@ execute: {[syms; side; sizes]
     if[not side in `buy`sell; '"side must be one of: `buy`sell"];
     if[(count sizes) <> n: count syms; '"syms and sizes must be of the same length"];
     prices: (market each syms) @ $[side = `buy; `ask; `bid];
-    `botTrades insert (n#.z.p; syms; n#side; prices; sizes);
+    logTrades (n#.z.p; syms; n#side; prices; sizes);
+    adjustHoldings[syms; side; prices; sizes];
+ }
+
+/ adjust holdings & bank given purchase/sale of syms
+adjustHoldings: {[syms; side; prices; sizes]
     bank +: $[side = `buy; -1; 1] * sum prices * sizes;
-    holding[syms] +: $[side = `buy; 1; -1] * sizes;
+    holdings[syms] +: $[side = `buy; 1; -1] * sizes;
+ }
+
+/ write a trade to botlog and in memory table
+logTrades: {[trades]
+    `botTrades insert trades;
+    botlogh enlist (`replayTrades; trades);
+ }
+
+replayTrades: {[trades]
+    `botTrades insert trades;
+    adjustHoldings[trades 1; first trades 2; trades 3; trades 4];
  }
 
 .u.eod: {[today]
-    / close out all open positions
-    execute[key holding; `sell; value holding];
+    / write our current holdings and bank to a file
+    holdingslog set (holdings; bank);
     / write botTrades to disk and clear memory
     .Q.dpft[`:hdb; today; `sym; `botTrades];
     delete from `botTrades;
+    / delete todays botlog
+    hclose botlogh;
+    hdel botlog;
+    / begin a new day
+    beginDay[];
     / tell hdb to reload
     h: hopen hdb;
-    h"\\l .";
+    (neg h)"\\l .";
     hclose h;
  }
 
-/ on start, get current world state from RDB
-stats: rdb(getStats; `trades);
-market: rdb(getMarket; `quotes);
+beginDay: {
+    botlog:: `$ raze string (botlogPrefix; .z.d);
+    if[not type key botlog;
+        / if the botlog doesn't already exist, write an empty list
+        .[botlog; (); :; ()]
+    ];
+    / replay the botlog (in case bot went down)
+    -11! botlog;
+    botlogh:: hopen botlog;
+ }
 
-/ subscribe to TP
-tp(`.u.sub; `; `);
-/ keep connection open so can receive updates from TP
+init: {
+    if[type key holdingslog;
+        / if holdingslog exists, read it in
+        tmp: get holdingslog;
+        holdings:: tmp 0;
+        bank:: tmp 1
+    ];
+    beginDay[];
+    / get current world state from RDB
+    rdbh: hopen rdb;
+    stats:: rdbh(getStats; `trades);
+    market:: rdbh(getMarket; `quotes);
+    hclose rdbh;
+    / subscribe to TP
+    (hopen tp)(`.u.sub; `; `);
+ }
+
+status: {
+    marketValue: exec first bid by sym from market where sym in key holdings;
+    bank + sum marketValue * holdings
+ }
+
+init[];
