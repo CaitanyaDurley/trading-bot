@@ -2,3 +2,4 @@ hdb/
 tplog*
 botlog*
 holdings*
+*.log

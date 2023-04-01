@@ -30,12 +30,12 @@ getMarket: {[t]
 / update stats and market with tick data
 upd: {[tab; newData]
     if[tab = `trades;
-        stats:: stats pj getStats newData
+        stats +: getStats newData
     ];
     if[tab = `quotes;
-        market:: market ^ getMarket newData
+        market ^: getMarket newData
     ];
-    trade[];
+    @[trade; `; {-2 x}];
  }
 
 / calculate the vwap
@@ -50,7 +50,7 @@ trade: {
     / we buy if the ask is less than the vwap
     buy: exec sym from market where vwap[sym] > (first; ask) fby sym;
     / else we sell (note we can never have ask < vwap < bid)
-    sell: (exec sym from market) except buy;
+    sell: (exec sym from stats) except buy;
     / we can only sell what we hold (no shorting)
     sell: sell inter where holdings > 0;
     if[count sell; execute[sell; `sell; holdings sell]];
@@ -94,6 +94,8 @@ replayTrades: {[trades]
     / write botTrades to disk and clear memory
     .Q.dpft[`:hdb; today; `sym; `botTrades];
     delete from `botTrades;
+    / start each day with a fresh perspective
+    delete from `stats;
     / delete todays botlog
     hclose botlogh;
     hdel botlog;

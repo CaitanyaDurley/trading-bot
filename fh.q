@@ -49,5 +49,5 @@ parseQuotes: {[quotes]
     if[n: count quotes; (neg tp)(`.u.upd; `quotes; update time: n#time from quotes)];
  }
 
-/ here we go
-(`$":ws://localhost:80")"GET /v1/multimarketdata?top_of_book=true&bids=true&offers=true&trades=true&symbols=BTCUSD,ETHUSD HTTP/1.1\r\nHost: api.gemini.com\r\n\r\n";
+syms: `btcusd`ethusd`ltcusd`dogeusd
+(`$":ws://localhost:80")"GET /v1/multimarketdata?top_of_book=true&bids=true&offers=true&trades=true&symbols=", sv[",";string syms], " HTTP/1.1\r\nHost: api.gemini.com\r\n\r\n";
