@@ -4,7 +4,7 @@
 
 / Bot parameters
 bank: 1000f; / How much USD we have in the bank
-reserve: bank % 10; / We will not buy if bank < reserve
+reserve: 0.1; / We will not buy if bank < reserve * current net worth
 holdings: (`symbol$())!`float$(); / how much of each sym we're holding
 botlogPrefix: `:botlog;
 holdingslog: `:holdings;
@@ -24,7 +24,7 @@ getStats: {[t]
 
 / save the current bid and ask
 getMarket: {[t]
-    select last bid, last ask by sym from t
+    select last fills bid, last fills ask by sym from t
  }
 
 / update stats and market with tick data
@@ -49,23 +49,23 @@ trade: {
     vwap: calcVwap[];
     / we buy if the ask is less than the vwap
     buy: exec sym from market where vwap[sym] > (first; ask) fby sym;
-    / else we sell (note we can never have ask < vwap < bid)
-    sell: (exec sym from stats) except buy;
+    / we sell if the bid is more than the vwap
+    / note we can never have ask < vwap < bid
+    sell: exec sym from market where vwap[sym] < (first; bid) fby sym;
     / we can only sell what we hold (no shorting)
     sell: sell inter where holdings > 0;
     if[count sell; execute[sell; `sell; holdings sell]];
     / execute buy trades, if we've got enough cash
-    if[(bank > reserve) and 0 < count buy;
+    if[(count buy) and bank > reserve * status[];
         usdPerSym: bank % 2 * count buy;
         sizes: usdPerSym % (exec first ask by sym from market) @ buy;
-        execute[buy; `buy; sizes];
+        execute[buy; `buy; sizes]
     ];
  }
 
 / buy/sell the given syms in given sizes
 execute: {[syms; side; sizes]
-    if[not side in `buy`sell; '"side must be one of: `buy`sell"];
-    if[(count sizes) <> n: count syms; '"syms and sizes must be of the same length"];
+    n: count syms;
     prices: (market each syms) @ $[side = `buy; `ask; `bid];
     logTrades (n#.z.p; syms; n#side; prices; sizes);
     adjustHoldings[syms; side; prices; sizes];
